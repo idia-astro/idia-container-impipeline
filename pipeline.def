@@ -1,0 +1,76 @@
+Bootstrap: debootstrap
+MirrorURL: http://ftp.leg.uct.ac.za/ubuntu/
+OSVersion: xenial
+Include: software-properties-common
+
+%environment
+export INSTALLER_PATH=/installer
+export SOFTWARE_PATH=/software
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
+export LC_ALL=C
+export MPICC=/usr/local/lib/bin/mpicc
+
+%post
+        # Create Installation Directories and export paths. This is needed as part of post.
+        # %environment scriptlet does not define these paths during %post, only after.
+        mkdir -p /software/ /installer
+        export INSTALLER_PATH=/installer
+
+
+        #update apt
+        # Installation of the KERN2 packages
+        apt-get update -y
+        apt-get install -y wget vim apt-utils git
+        add-apt-repository -s ppa:kernsuite/kern-2
+        add-apt-repository ppa:kelleyk/emacs
+        apt-add-repository multiverse
+        apt-add-repository restricted
+        apt-get update -y
+
+        apt-get install -y build-essential transfig libffi-dev libfftw3-dev libfftw3-doc nano emacs25 dialog python-tk
+        
+        #install pip
+        apt-get install -y python-pip python-dev
+        pip install --upgrade pip
+
+        #Installation of FFTW
+        pip install numpy pyfftw h5py healpy 
+	#env MPICC=/usr/local/lib/bin/mpicc  pip install mpi4py	
+
+       #Istallation of ipykernel
+        pip install 'ipython>=5.0.0,<6.0.0' ipykernel 
+
+        #Installation of gsl
+        cd $INSTALLER_PATH
+        wget ftp://ftp.gnu.org/gnu/gsl/gsl-latest.tar.gz -O - | tar -xz
+        cd $INSTALLER_PATH/gsl-*
+        ./configure
+        make
+        make install
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
+
+        #installtion of openmpi
+        cd $INSTALLER_PATH
+        wget https://www.open-mpi.org/software/ompi/v3.0/downloads/openmpi-3.0.0.tar.gz -O - | tar -xz
+        cd openmpi*
+        ./configure --prefix=/usr/local/lib/
+        make
+        make install
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
+
+
+        # Create /users to bind home directories into the container.
+        mkdir -p /users /scratch /data
+
+        # Cleanup
+        apt-get clean
+        apt-get autoclean
+
+%runscript
+if [ $# -eq 0 ]; then
+        echo "The following Python modules are installed in this image:"
+        pip freeze
+        echo "Example usage: singularity.img [command] [args] [options]"
+else
+        exec "$@"
+fi
